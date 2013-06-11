@@ -57,13 +57,9 @@ def ConcatDFGroups(dataframe):
         dfTemp = pd.concat([dfTemp,DictOfGroups[key]])
     
     return dfTemp            
-#def ParseAAChangeColumn(dfTemp):
-    #create new dataframe with AA split, then merge it back with orginal data
-    #pass
-    #dfTemp.AAChange
               
 def CreateExcel(FilesToMerge):
-    ExcelWBWriter = pd.ExcelWriter(os.curdir+"/Variants.xlsx")
+    ExcelWBWriter = pd.ExcelWriter(os.curdir+"/"+"Variants.xlsx")
     for file in FilesToMerge:
         print(file)
         dfTemp = ParseCSV(os.curdir+"/"+file)
@@ -78,17 +74,93 @@ def CreateExcel(FilesToMerge):
         dfTemp = ConcatDFGroups(dfTemp)
         
         #reorder file -- could have done this in the dfTemp.to_excel  
+        #This saves the tabs
+        #STRANGE If I write to csv the row order is not kept However if write to excel
+        #then read it back in then write to csv everything is fine
+        
+        #put dataframe in excel object to write
+        #save excel workbook
+        dfTemp.to_csv(file[StartPosition:EndPosition]+".csv",index=False)
+        NewFile = FixAAChangeColumn(file[StartPosition:EndPosition]+".csv")
+        for row, line in enumerate(NewFile):
+            print(row," ",len(line), " ",line)
+            
+        ColHeaders = NewFile.pop(0)
+        dfTemp = pd.DataFrame(NewFile, columns = ColHeaders)
         dfTemp = dfTemp[["Func","Gene","Chr","Start","End","Ref","Obs",
                          "Otherinfo","ExonicFunc",
-        "AAChange","Conserved","SegDup","ESP6500_ALL",
+        "Transcript","Exon","Nucleotide Change","Protein Change","Conserved","SegDup","ESP6500_ALL",
         "1000g2012apr_ALL","dbSNP137","AVSIFT","LJB_PhyloP","LJB_PhyloP_Pred","LJB_SIFT",
         "LJB_SIFT_Pred","LJB_PolyPhen2","LJB_PolyPhen2_Pred","LJB_LRT","LJB_LRT_Pred",
         "LJB_MutationTaster","LJB_MutationTaster_Pred","LJB_GERP++"]]
-        #This saves the tabs
         dfTemp.to_excel(ExcelWBWriter, file[StartPosition:EndPosition],index=False)
-        #dfTemp.to_csv(file[StartPosition:EndPosition]+".csv")
+              
+    ExcelWBWriter.save()      
     #Write the workbook           
-    ExcelWBWriter.save()
+
+
+def HeaderRemoveAAChange(header, ItemToRemove):
+    return [ item for item in header if not item == ItemToRemove]
+
+def InsertNewColumns(line, Position, ColsToAdd, RevColumns=0):
+    if RevColumns:
+        ColsToAdd.reverse()
+    for item in ColsToAdd: line.insert(Position, item) 
+    return line
+
+def SplitColumn(line,columnToSplit,delimter):
+    if line[columnToSplit] == " " or line[columnToSplit] == "":
+        line = InsertNewColumns(line, 3, [' ',' ',' '])
+        return line,0
+    else:
+        #different records are sperated by ","
+        items = line[columnToSplit].split(",")
+        if len(items) == 1:
+            items = items[0].split(":")
+            #delete the AAchange column
+            del line[3]
+            line = InsertNewColumns(line, 3, items[1:], RevColumns=1)
+            return line,0
+        else:
+            FirstRow = 1
+            lines = []
+            while (items):
+                VariantHGVS = items[0].split(":") 
+                if FirstRow:
+                    del line[3]
+                    FirstRow = 0
+                    line = InsertNewColumns(line, 3, VariantHGVS[1:5], RevColumns=1)
+                    items.pop(0)
+                    lines.append(line)
+                else:
+                    line = " ,"*26
+                    line = line.rstrip(",")
+                    line = InsertNewColumns(line.split(","), 3, VariantHGVS[1:5], RevColumns=1)
+                    items.pop(0)
+                    lines.append(line)
+            return lines,1
+
+def FixAAChangeColumn(csvFile):
+    with open(csvFile) as fhcsvfile:
+        listToWrite = []
+        csvReader = csv.reader(fhcsvfile)
+        header = next(csvReader)
+        print(header)
+        header = HeaderRemoveAAChange(header, "AAChange")
+        print(header)
+        listToWrite.append(InsertNewColumns(header, 3,["Transcript","Exon","Nucleotide Change","Protein Change"],RevColumns=1))
+        
+        for line in csvReader:
+            ReformatedRow,multidem = SplitColumn(line, 3, ":")
+            if multidem:
+                for item in ReformatedRow:
+                    listToWrite.append(item)
+            else:
+                listToWrite.append(ReformatedRow)
+                
+        return listToWrite       
+                
+
 def FindGenomeSummaryFiles():
     return [file for file in os.listdir(os.curdir) if fnmatch.fnmatch(file, "*genome_summary*.csv") ]
 

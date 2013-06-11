@@ -2,8 +2,8 @@ import pandas as pd
 import os
 
 os.chdir('/miseqdata/Annotation_files')
-xls = pd.ExcelFile('52GenesWithExonCoordinates-EDIT-2-28-13.xlsx')
-bedDF = xls.parse('52GeneLib',header=None,parse_cols=5)
+xls = pd.ExcelFile('cardiomyoPanelExons_edit042213.xlsx')
+bedDF = xls.parse('CardioPanelExons_ForDepthOfCove',header=None,parse_cols=5)
 bedDF.groupby(0)
 GroupedByGeneSymbol = []
 for x,y in bedDF.groupby(0):
@@ -22,5 +22,7 @@ for group in GroupedByGeneSymbol:
     group[4] = group[6]
     FixedBed.append(group.drop(6,axis=1))
 DFToWrite = pd.concat(FixedBed)
-DFToWrite.to_csv('52GeneBedFile0228EDITS_ForDepthOfCoverage.bed',sep="\t", index=False,header = False,float_format = "%i")
-DFToWrite.ix[1,[1,2,3,0,4,5]].to_csv('52GeneBedFile0228EDITS.bed',sep=" ", index=False,header = False,float_format = "%i")
+#This writes the Depth Of coverage file
+DFToWrite.to_csv('cardiomyoPanelExons_edit042213_ForDepthOfCoverage.txt',sep="\t", index=False,header = False,float_format = "%i")
+#This writes a true bed file
+DFToWrite.ix[:,[1,2,3,0,4,5]].to_csv('cardiomyoPanelExons_edit042213.bed',sep="\t", index=False,header = False,float_format = "%i")
